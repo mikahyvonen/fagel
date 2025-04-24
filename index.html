@@ -1,0 +1,1140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Webcam Feed</title>
+    <style>
+        @font-face {
+            font-family: 'DM Sans';
+            src: url('fonts/DMSans-Regular.ttf') format('truetype');
+            font-weight: normal;
+            font-style: normal;
+        }
+
+        @font-face {
+            font-family: 'DM Sans';
+            src: url('fonts/DMSans-Medium.ttf') format('truetype');
+            font-weight: 500;
+            font-style: normal;
+        }
+
+        @font-face {
+            font-family: 'DM Sans';
+            src: url('fonts/DMSans-Bold.ttf') format('truetype');
+            font-weight: bold;
+            font-style: normal;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            overflow: hidden;
+            background-color: #000;
+            font-size: 10vw; /* Increase base font size using viewport width */
+            margin-right: 75px; /* Adjusted to match stripe width */
+        }
+        
+        #webcam-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: calc(100vw - 75px); /* Adjusted to match stripe width */
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+        
+        #webcam {
+            min-width: 100%;
+            min-height: 100%;
+            width: auto;
+            height: auto;
+            object-fit: cover;
+            transform: scaleX(-1);
+            filter: grayscale(100%) hue-rotate(200deg) brightness(1.1);
+            border-radius: 25px;
+        }
+
+        #overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            min-width: 100%;
+            min-height: 100%;
+            width: auto;
+            height: auto;
+            pointer-events: none;
+            object-fit: cover;
+        }
+
+        #text-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            min-width: 100%;
+            min-height: 100%;
+            width: auto;
+            height: auto;
+            pointer-events: none;
+            object-fit: cover;
+        }
+
+        #overlay-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            transform: scaleX(-1);
+        }
+
+        #class-counters {
+            position: fixed;
+            top: 85px;
+            left: 5vw;
+            color: white;
+            font-family: 'DM Sans', sans-serif;
+            font-size: 4vw;
+            background-color: black;
+            padding: 20px;
+            border-radius: 15px;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .counter-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .counter-dot {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+        }
+
+        .counter-dot.fiskare {
+            background-color: var(--fiskare-color);
+        }
+
+        .counter-dot.fisk {
+            background-color: var(--fisk-color);
+        }
+
+        .counter-dot.fågel {
+            background-color: var(--fågel-color);
+        }
+
+        #outer-meter-container {
+            position: fixed;
+            top: 16.5%;
+            left: 5vw;
+            height: 55%;
+            width: 80px;
+            background-color: black;
+            border: 8px solid black;
+            border-radius: 15px;
+            z-index: 1000;
+            transform: rotate(180deg);
+        }
+
+        #meter-container {
+            position: relative;
+            height: 100%;
+            width: 100%;
+            display: flex;
+            flex-direction: column-reverse;
+            background-color: transparent;
+            border: 2px solid white;
+            border-radius: 10px;
+        }
+
+        #meter-container.increasing {
+            border-color: #ff5900;
+            animation: pulse 1s ease;
+        }
+
+        #meter-container.decreasing {
+            border-color: #00ddff;
+            animation: pulse 1s ease;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        #meter-explanation {
+            position: fixed;
+            top: 25%;
+            left: 15vw;
+            color: white;
+            font-family: 'DM Sans', sans-serif;
+            font-size: 2vw;
+            background-color: rgba(0, 0, 0, 0.8);
+            padding: 20px;
+            border-radius: 15px;
+            z-index: 1001;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+            pointer-events: none;
+            max-width: 300px;
+            line-height: 1.6;
+            border: 2px solid white;
+            visibility: hidden;
+        }
+
+        #meter-explanation.visible {
+            opacity: 1;
+        }
+
+        .explanation-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 5px 0;
+        }
+
+        .explanation-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+
+        .explanation-dot.fiskare {
+            background-color: var(--fiskare-color);
+        }
+
+        .explanation-dot.fisk {
+            background-color: var(--fisk-color);
+        }
+
+        .explanation-dot.fågel {
+            background-color: var(--fågel-color);
+        }
+
+        .block {
+            flex: 1;
+            background-color: transparent;
+            position: relative;
+            margin: 2px 0;
+            overflow: hidden;
+        }
+
+        .block:first-child {
+            margin-top: 0;
+        }
+
+        .block:last-child {
+            margin-bottom: 0;
+        }
+
+        .block-fill {
+            position: absolute;
+            left: 0;
+            right: 0;
+            height: 0;
+            transition: height 1.5s ease, background-color 0.3s ease;
+        }
+
+        /* Since the container is rotated 180deg, we need to reverse the filling direction */
+        #outer-meter-container .block .block-fill {
+            top: 0;
+            bottom: auto;
+        }
+
+        .block.active .block-fill {
+            height: 100%;
+        }
+
+        /* Base colors */
+        .block .block-fill {
+            background-color: white;
+        }
+
+        /* Temporary colors during animation */
+        .block.fiskare:not(.white):not(.orange):not(.red) .block-fill {
+            background-color: #ff5900;
+        }
+
+        .block.fisk:not(.white):not(.orange):not(.red) .block-fill {
+            background-color: #00ddff;
+        }
+
+        /* Final colors */
+        .block.white .block-fill {
+            background-color: white;
+        }
+
+        .block.orange .block-fill {
+            background-color: #ff5900;
+        }
+
+        .block.red .block-fill {
+            background-color: rgb(130, 0, 19);
+        }
+
+        #bottom-meter {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            width: 100%;
+            border: 2px solid white;
+            border-radius: 8px;
+            background-color: transparent;
+            z-index: 1002;
+        }
+
+        #meter-label {
+            position: fixed;
+            top: 25%;
+            left: -1.5vw; /* Adjust label position relative to meter */
+            color: white;
+            font-family: 'DM Sans', sans-serif;
+            font-size: 3vw;
+            /*background-color: black;*/
+            padding: 4px;
+            border-radius: 2px;
+            z-index: 1001;
+            transform: rotate(-90deg);
+        }
+
+        #class-text-box {
+            position: fixed;
+            top: 72%;
+            left: 5vw;
+            right: 8vw;
+            color: white;
+            font-family: 'DM Sans', sans-serif;
+            font-size: 5vw;
+            background-color: rgba(0, 0, 0, 1);
+            padding: 6vw;
+            border-radius: 20px;
+            z-index: 1000;
+            border: 6px solid white;
+            text-align: center;
+            line-height: 1.4;
+            margin-top: 20px;
+        }
+
+        #class-text-box.fisk {
+            border-color: var(--fisk-color);
+        }
+
+        #class-text-box.fågel {
+            border-color: var(--fågel-color);
+        }
+
+        #class-text-box.fiskare {
+            border-color: var(--fiskare-color);
+        }
+
+        #fullscreen-video {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            object-fit: cover;
+            z-index: 9000;
+            display: none;
+            cursor: pointer;
+        }
+
+        #fullscreen-video.visible {
+            display: block;
+        }
+
+        #blue-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 179, 255, 0.2);
+            pointer-events: none;
+            mix-blend-mode: overlay;
+            transition: background-color 0.5s ease;
+        }
+
+        #blue-overlay.warning {
+            background-color: rgba(255, 0, 0, 0.08);
+        }
+
+        #blue-overlay.critical {
+            background-color: rgba(255, 0, 0, 0.15);
+        }
+
+        @keyframes pulse-red-subtle {
+            0% { opacity: 0.08; }
+            50% { opacity: 0.12; }
+            100% { opacity: 0.08; }
+        }
+
+        .glitch-effect {
+            animation: glitch 0.3s infinite;
+        }
+
+        @keyframes glitch {
+            0% {
+                transform: translate(0);
+                filter: hue-rotate(0deg);
+            }
+            20% {
+                transform: translate(-5px, 5px);
+                filter: hue-rotate(90deg);
+            }
+            40% {
+                transform: translate(5px, -5px);
+                filter: hue-rotate(180deg);
+            }
+            60% {
+                transform: translate(-5px, -5px);
+                filter: hue-rotate(270deg);
+            }
+            80% {
+                transform: translate(5px, 5px);
+                filter: hue-rotate(360deg);
+            }
+            100% {
+                transform: translate(0);
+                filter: hue-rotate(0deg);
+            }
+        }
+
+        #video-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 1.0;
+            mix-blend-mode: color-dodge;
+            pointer-events: none;
+            object-fit: cover;
+            z-index: 10000;
+        }
+
+        @media (max-width: 600px) {
+            body {
+                font-size: 4vw;
+            }
+        }
+
+        @media (min-width: 1200px) {
+            body {
+                font-size: 1.5vw;
+            }
+        }
+
+        :root {
+            --fiskare-color: #ff5900;
+            --fisk-color: #00ddff;
+            --fågel-color: #00d065;
+        }
+
+        .special-italic {
+            color: inherit;
+            font-style: italic;
+        }
+
+        /* Add the black stripe */
+        #right-stripe {
+            position: fixed;
+            top: 0;
+            right: 0;
+            width: 75px;
+            height: 100vh;
+            background-color: black;
+            z-index: 10000;
+        }
+
+        /* Add styles for JavaScript-created elements */
+        .face-label {
+            border-radius: 10px;
+            padding: 4px 8px;
+        }
+
+        .face-box {
+            border-radius: 15px;
+            border: 5px solid;
+        }
+
+        #fade-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: black;
+            z-index: 8999;
+            opacity: 0;
+            pointer-events: none;
+            display: none;
+            transition: opacity 1s ease;
+        }
+
+        #fade-overlay.visible {
+            display: block;
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+    <div id="right-stripe"></div>
+    <div id="webcam-container">
+        <video id="webcam" autoplay playsinline></video>
+        <div id="overlay-container">
+            <canvas id="overlay"></canvas>
+        </div>
+        <canvas id="text-overlay"></canvas>
+    </div>
+    <div id="class-counters">
+        <div class="counter-row">
+            <div class="counter-dot fiskare"></div>
+            <span id="fiskare-counter">fiskare: 0</span>
+        </div>
+        <div class="counter-row">
+            <div class="counter-dot fisk"></div>
+            <span id="fisk-counter">fisk: 0</span>
+        </div>
+        <div class="counter-row">
+            <div class="counter-dot fågel"></div>
+            <span id="fågel-counter">fågel: 0</span>
+        </div>
+    </div>
+    <div id="class-text-box"></div>
+    <div id="meter-label">systemkollaps</div>
+    <div id="outer-meter-container">
+        <div id="meter-container">
+            <div id="bottom-meter">
+                <div class="block"><div class="block-fill"></div></div>
+                <div class="block"><div class="block-fill"></div></div>
+                <div class="block"><div class="block-fill"></div></div>
+                <div class="block"><div class="block-fill"></div></div>
+                <div class="block"><div class="block-fill"></div></div>
+                <div class="block"><div class="block-fill"></div></div>
+                <div class="block"><div class="block-fill"></div></div>
+                <div class="block"><div class="block-fill"></div></div>
+                <div class="block"><div class="block-fill"></div></div>
+                <div class="block"><div class="block-fill"></div></div>
+            </div>
+        </div>
+    </div>
+    <div id="meter-explanation">
+        <strong>Systemkollaps-meter:</strong><br>
+        <div class="explanation-item">
+            <div class="explanation-dot fiskare"></div>
+            <span>Fiskare → närmare kollaps</span>
+        </div>
+        <div class="explanation-item">
+            <div class="explanation-dot fisk"></div>
+            <span>Fisk → längre från kollaps</span>
+        </div>
+        <div class="explanation-item">
+            <div class="explanation-dot fågel"></div>
+            <span>Fågel → neutral påverkan</span>
+        </div>
+    </div>
+    <video id="fullscreen-video" autoplay muted playsinline>
+        <source src="fogel anim.mp4" type="video/mp4">
+    </video>
+    <div id="blue-overlay"></div>
+    <div id="fade-overlay"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+    <script>
+        const video = document.getElementById('webcam');
+        const overlay = document.getElementById('overlay');
+        const overlayCtx = overlay.getContext('2d');
+        const textOverlay = document.getElementById('text-overlay');
+        const textCtx = textOverlay.getContext('2d');
+        const fullscreenVideo = document.getElementById('fullscreen-video');
+        let isVideoPlaying = false;
+        let videoTriggered = false;
+
+        // Handle video end
+        fullscreenVideo.addEventListener('ended', () => {
+            fullscreenVideo.style.display = 'none';
+            isVideoPlaying = false;
+        });
+
+        // Load required models
+        Promise.all([
+            faceapi.nets.tinyFaceDetector.loadFromUri('https://justadudewhohacks.github.io/face-api.js/models'),
+            faceapi.nets.faceExpressionNet.loadFromUri('https://justadudewhohacks.github.io/face-api.js/models')
+        ]).then(initializeCamera);
+
+        async function initializeCamera() {
+            try {
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                const videoDevices = devices.filter(device => device.kind === 'videoinput');
+                
+                // Try to find an external camera (usually has a label)
+                let preferredDevice = videoDevices.find(device => device.label && device.label.toLowerCase().includes('external')) ||
+                                    videoDevices.find(device => device.label && !device.label.toLowerCase().includes('built-in')) ||
+                                    videoDevices[0]; // Fallback to first available camera
+
+                if (preferredDevice) {
+                    startVideo(preferredDevice.deviceId);
+                } else {
+                    console.error('No cameras found');
+                }
+            } catch (error) {
+                console.error('Error enumerating devices:', error);
+            }
+        }
+
+        async function startVideo(deviceId) {
+            try {
+                // Stop any existing stream
+                if (video.srcObject) {
+                    video.srcObject.getTracks().forEach(track => track.stop());
+                }
+
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: {
+                        deviceId: { exact: deviceId },
+                        width: { ideal: 1920 },
+                        height: { ideal: 1080 },
+                        frameRate: { ideal: 30 }
+                    } 
+                });
+                
+                video.srcObject = stream;
+                
+                // Wait for the video to be ready
+                await new Promise((resolve) => {
+                    video.onloadedmetadata = () => {
+                        resolve();
+                    };
+                });
+
+                // Set canvas sizes to match video
+                overlay.width = video.videoWidth;
+                overlay.height = video.videoHeight;
+                textOverlay.width = video.videoWidth;
+                textOverlay.height = video.videoHeight;
+                
+                // Enable image smoothing for better quality
+                overlayCtx.imageSmoothingEnabled = true;
+                textCtx.imageSmoothingEnabled = true;
+                
+                // Set the video dimensions to match the stream's aspect ratio
+                const aspectRatio = video.videoWidth / video.videoHeight;
+                const container = document.getElementById('webcam-container');
+                
+                function updateVideoSize() {
+                    const containerWidth = window.innerWidth;
+                    const containerHeight = window.innerHeight;
+                    const containerRatio = containerWidth / containerHeight;
+                    
+                    if (containerRatio > aspectRatio) {
+                        // Container is wider than video aspect ratio
+                        video.style.width = 'auto';
+                        video.style.height = '100%';
+                    } else {
+                        // Container is taller than video aspect ratio
+                        video.style.width = '100%';
+                        video.style.height = 'auto';
+                    }
+
+                    // Update overlay sizes to match video
+                    const videoRect = video.getBoundingClientRect();
+                    overlay.style.width = videoRect.width + 'px';
+                    overlay.style.height = videoRect.height + 'px';
+                    textOverlay.style.width = videoRect.width + 'px';
+                    textOverlay.style.height = videoRect.height + 'px';
+                }
+                
+                // Update size on load and resize
+                updateVideoSize();
+                window.addEventListener('resize', updateVideoSize);
+
+                // Start face detection
+                detectFaces();
+                
+            } catch (error) {
+                console.error('Error accessing webcam:', error);
+                alert('Could not access webcam. Please make sure you have granted camera permissions.');
+            }
+        }
+
+        async function detectFaces() {
+            const displaySize = { width: video.videoWidth, height: video.videoHeight };
+            
+            // Resize canvases to match video dimensions
+            faceapi.matchDimensions(overlay, displaySize);
+            faceapi.matchDimensions(textOverlay, displaySize);
+
+            // Swedish translations for expressions
+            const expressionTranslations = {
+                'neutral': 'neutral',
+                'happy': 'glad',
+                'sad': 'ledsen',
+                'angry': 'arg',
+                'fearful': 'rädd',
+                'disgusted': 'äcklad',
+                'surprised': 'förvånad'
+            };
+
+            // Tracking variables
+            let faceCounter = 0;
+            let trackedFaces = new Map(); // Track faces and their IDs
+            let currentVisibleFaces = 0;
+            const maxTrackingDistance = 100;
+            const maxSizeChange = 0.3;
+            const framesToKeepFace = 10; // Number of frames to keep a face ID before reassigning
+            const faceLastSeen = new Map(); // Track when each face was last seen
+            const faceClasses = new Map(); // Track which class each face belongs to
+            
+            // Two sets of counters: one that accumulates forever and one that resets
+            const permanentCounters = {
+                fiskare: 0,
+                fisk: 0,
+                fågel: 0
+            };
+            
+            const meterCounters = {
+                fiskare: 0,
+                fisk: 0,
+                fågel: 0
+            };
+            
+            // Track the message assigned to each face
+            const faceMessages = new Map();
+
+            // =============================================
+            // CLASS PROBABILITY CONFIGURATION
+            // Modify these values to change the probability of each class
+            // Values should sum to 1.0 (100%)
+            const classProbabilities = {
+                fiskare: 0.6,  // 60% chance
+                fisk: 0.2,     // 20% chance
+                fågel: 0.2     // 20% chance
+            };
+            // =============================================
+
+            // Text messages for each class
+            const classMessages = {
+                fisk: [
+                    "Du är en fisk. Näringen du söker hänger i verket <i>V.I.P. (Very Important Plankton)</i>. Sök efter glas.",
+                    "Du är dagens lunch!",
+                    "Du är en fisk. Akta dig för fiskare!",
+                    "Du är en fisk. Havsfåglarnas favoritmat!",
+                    "Du är en fisk. Tack för att du finns – du har just tagit oss ett steg längre från systemkollaps!"
+                ],
+                fågel: [
+                    "En fågel viskar i ditt öra: <span class='special-italic'>Du är en sillgrissla – du är en av oss</span>",
+                    "Du är en fågel. Verket <i>Därför grönskar Arktis</i> handlar om ditt bajs och dess roll i ekosystemet.",
+                    "Du är en sillgrissla. Systemkollaps för dig innebär mindre sex och färre ungar.",
+                    "Du är en sillgrissla. Du har ett nasalt läte och låter ungefär såhär: wha wha wha!",
+                    "Du är en sillgrissla. Du berättar för forskarna om vad som händer under havsytan!"
+                    
+                ],
+                fiskare: [
+                    "Besök verket <i>Tipping Points</i> för att förstå ekosystemet bättre.",
+                    "Du är en fiskare. Du märker hur mycket lättare ditt nät är.",
+                    "Lär dig mer om din förmåga att hantera förändring i verket <i>Ett steg ur din comfort zone</i>.",
+                    "Förstå din påverkan på planeten genom att spegla dig i verket <i>Profetian i isen</i>.",
+                    "Du är en fiskare. Ditt överfiske förde oss just ett steg närmare systemkollaps!",
+                    "Lär dig mer om naturens förmåga att arkivera historia i verket <i>Ur Evig Dvala</i>.",
+                    "Du är en fiskare. "
+                ]
+            };
+
+            // Function to update meter based on class counters
+            function updateMeter() {
+                setTimeout(() => {
+                    const meterFill = document.getElementById('bottom-meter');
+                    const fiskarePoints = meterCounters.fiskare;
+                    const fiskPoints = meterCounters.fisk;
+                    const blocks = meterFill.children;
+                    const activeBlocks = 5 + fiskarePoints - fiskPoints;
+                    const blueOverlay = document.getElementById('blue-overlay');
+
+                    for (let i = 0; i < blocks.length; i++) {
+                        const block = blocks[i];
+                        const willBeActive = i < activeBlocks;
+                        
+                        // Remove active class but keep color classes
+                        block.classList.remove('active');
+                        
+                        // Set initial colors based on position
+                        if (i >= 8) {
+                            block.classList.add('red');
+                            block.classList.add('fiskare');
+                        } else if (i >= 5) {
+                            block.classList.add('orange');
+                            block.classList.add('fiskare');
+                        } else {
+                            block.classList.add('white');
+                            block.classList.add('fisk');
+                        }
+                        
+                        // Add active class if block should be filled
+                        if (willBeActive) {
+                            block.classList.add('active');
+                        }
+
+                        // Update overlay effects based on highest active block
+                        if (i >= 8 && willBeActive) {
+                            blueOverlay.classList.remove('warning');
+                            blueOverlay.classList.add('critical');
+                        } else if (i >= 7 && willBeActive) {
+                            blueOverlay.classList.remove('critical');
+                            blueOverlay.classList.add('warning');
+                        } else if (i < 7) {
+                            blueOverlay.classList.remove('warning', 'critical');
+                        }
+                    }
+
+                    // Show explanation for new faces
+                    const explanation = document.getElementById('meter-explanation');
+                    if (currentVisibleFaces > 0 && !explanation.classList.contains('visible')) {
+                        explanation.classList.add('visible');
+                        setTimeout(() => explanation.classList.remove('visible'), 5000);
+                    }
+
+                    // Update the visual counters
+                    document.getElementById('fiskare-counter').textContent = `fiskare: ${permanentCounters.fiskare}`;
+                    document.getElementById('fisk-counter').textContent = `fisk: ${permanentCounters.fisk}`;
+                    document.getElementById('fågel-counter').textContent = `fågel: ${permanentCounters.fågel}`;
+
+                    if (activeBlocks >= 10 && !isVideoPlaying && !videoTriggered) {
+                        videoTriggered = true;
+                        setTimeout(() => {
+                            playVideo();
+                            resetMeter();
+                            videoTriggered = false;
+                            blueOverlay.classList.remove('warning', 'critical');
+                        }, 1000);
+                    }
+                }, 500);
+            }
+            
+            // Function to play the video
+            function playVideo() {
+                fullscreenVideo.style.display = 'block';
+                fullscreenVideo.currentTime = 0;
+                fullscreenVideo.play();
+                isVideoPlaying = true;
+            }
+            
+            // Function to reset meter to 50%
+            function resetMeter() {
+                const meterFill = document.getElementById('bottom-meter');
+                const blocks = meterFill.children;
+                for (let i = 0; i < blocks.length; i++) {
+                    blocks[i].classList.remove('active', 'white', 'orange', 'red', 'fiskare', 'fisk');
+                }
+                
+                // Reset only the meter counters, not the permanent ones
+                meterCounters.fiskare = 0;
+                meterCounters.fisk = 0;
+                meterCounters.fågel = 0;
+            }
+
+            // Function to assign a random class to a face based on probabilities
+            function assignRandomClass() {
+                const random = Math.random();
+                let cumulativeProbability = 0;
+                
+                for (const [className, probability] of Object.entries(classProbabilities)) {
+                    cumulativeProbability += probability;
+                    if (random <= cumulativeProbability) {
+                        // Increment both sets of counters
+                        permanentCounters[className]++;
+                        meterCounters[className]++;
+                        return className;
+                    }
+                }
+                
+                // Fallback to fågel if something goes wrong
+                permanentCounters.fågel++;
+                meterCounters.fågel++;
+                return 'fågel';
+            }
+
+            const classColors = {
+                fiskare: getComputedStyle(document.documentElement).getPropertyValue('--fiskare-color').trim(),
+                fisk: getComputedStyle(document.documentElement).getPropertyValue('--fisk-color').trim(),
+                fågel: getComputedStyle(document.documentElement).getPropertyValue('--fågel-color').trim()
+            };
+
+            function getClassColor(faceClass) {
+                return classColors[faceClass];
+            }
+
+            // Function to get the label for a face
+            function getFaceLabel(faceClass, faceId) {
+                const prefix = faceClass === 'fiskare' ? 'fiskare' : 
+                             faceClass === 'fisk' ? 'fisk' : 'fågel';
+                return `${prefix}_${permanentCounters[faceClass].toString().padStart(2, '0')}`;
+            }
+
+            function calculateFaceArea(box) {
+                return box.width * box.height;
+            }
+
+            function calculateSizeChange(oldBox, newBox) {
+                const oldArea = calculateFaceArea(oldBox);
+                const newArea = calculateFaceArea(newBox);
+                return Math.abs(newArea - oldArea) / oldArea;
+            }
+
+            function calculateFaceCenter(box) {
+                return {
+                    x: box.x + box.width / 2,
+                    y: box.y + box.height / 2
+                };
+            }
+
+            function calculateDistance(center1, center2) {
+                return Math.sqrt(
+                    Math.pow(center1.x - center2.x, 2) +
+                    Math.pow(center1.y - center2.y, 2)
+                );
+            }
+
+            function findClosestTrackedFace(box) {
+                let closestFace = null;
+                let minDistance = Infinity;
+                const newCenter = calculateFaceCenter(box);
+
+                trackedFaces.forEach((trackedBox, id) => {
+                    const trackedCenter = calculateFaceCenter(trackedBox);
+                    const distance = calculateDistance(newCenter, trackedCenter);
+                    const sizeChange = calculateSizeChange(trackedBox, box);
+                    
+                    if (distance < minDistance && 
+                        distance < maxTrackingDistance && 
+                        sizeChange < maxSizeChange) {
+                        minDistance = distance;
+                        closestFace = { id, box: trackedBox };
+                    }
+                });
+
+                return closestFace;
+            }
+
+            // Function to update text box based on largest face
+            function updateClassTextBox() {
+                const textBox = document.getElementById('class-text-box');
+                let largestFace = null;
+                let largestArea = 0;
+
+                trackedFaces.forEach((box, faceId) => {
+                    const area = box.width * box.height;
+                    if (area > largestArea) {
+                        largestArea = area;
+                        largestFace = { box, faceId };
+                    }
+                });
+
+                if (largestFace) {
+                    const faceClass = faceClasses.get(largestFace.faceId);
+                    const classColor = getClassColor(faceClass); // Get the class color
+
+                    // If this face doesn't have a message assigned yet, assign one
+                    if (!faceMessages.has(largestFace.faceId)) {
+                        const messages = classMessages[faceClass];
+                        const randomMessage = messages[Math.floor(Math.random() * messages.length)];
+                        faceMessages.set(largestFace.faceId, randomMessage);
+                    }
+
+                    // Use the stored message for this face
+                    const message = faceMessages.get(largestFace.faceId);
+                    textBox.innerHTML = message;
+                    textBox.className = faceClass;
+                    textBox.style.display = 'block'; // Make sure the text box is visible
+
+                    // Apply class color to italicized text
+                    textBox.querySelectorAll('i').forEach(italic => {
+                        italic.style.color = classColor;
+                    });
+                } else {
+                    textBox.style.display = 'none'; // Hide the text box completely when no face is detected
+                }
+            }
+
+            setInterval(async () => {
+                const detections = await faceapi.detectAllFaces(
+                    video, 
+                    new faceapi.TinyFaceDetectorOptions({ 
+                        inputSize: 320,
+                        scoreThreshold: 0.3
+                    })
+                ).withFaceExpressions();
+
+                // Resize detections to match display size
+                const resizedDetections = faceapi.resizeResults(detections, displaySize);
+                
+                // Update the current visible faces count
+                currentVisibleFaces = resizedDetections.length;
+                
+                // Update face tracking
+                const newTrackedFaces = new Map();
+                const usedIds = new Set();
+
+                // First pass: try to match existing faces
+                resizedDetections.forEach((detection) => {
+                    const box = detection.detection.box;
+                    const closestFace = findClosestTrackedFace(box);
+                    if (closestFace && !usedIds.has(closestFace.id)) {
+                        newTrackedFaces.set(closestFace.id, box);
+                        usedIds.add(closestFace.id);
+                        faceLastSeen.set(closestFace.id, 0); // Reset the "last seen" counter
+                    }
+                });
+
+                // Second pass: handle unmatched faces
+                resizedDetections.forEach((detection) => {
+                    const box = detection.detection.box;
+                    if (!Array.from(newTrackedFaces.values()).includes(box)) {
+                        // Try to find a recently lost face ID
+                        let foundExistingId = false;
+                        for (const [id, framesLost] of faceLastSeen.entries()) {
+                            if (framesLost < framesToKeepFace && !usedIds.has(id)) {
+                                newTrackedFaces.set(id, box);
+                                usedIds.add(id);
+                                faceLastSeen.set(id, 0);
+                                foundExistingId = true;
+                                break;
+                            }
+                        }
+                        
+                        // Only create a new ID if we couldn't find a recently lost face
+                        if (!foundExistingId) {
+                            const newId = ++faceCounter;
+                            newTrackedFaces.set(newId, box);
+                            faceLastSeen.set(newId, 0);
+                            faceClasses.set(newId, assignRandomClass()); // Assign random class to new face
+                        }
+                    }
+                });
+
+                // Update last seen counters for all tracked faces
+                faceLastSeen.forEach((framesLost, id) => {
+                    if (!newTrackedFaces.has(id)) {
+                        faceLastSeen.set(id, framesLost + 1);
+                    }
+                });
+
+                // Clean up old faces that have been lost for too long
+                for (const [id, framesLost] of faceLastSeen.entries()) {
+                    if (framesLost >= framesToKeepFace) {
+                        faceLastSeen.delete(id);
+                        faceClasses.delete(id); // Remove the class assignment
+                        faceMessages.delete(id); // Remove the message assignment
+                    }
+                }
+
+                // Update tracked faces
+                trackedFaces = newTrackedFaces;
+                
+                // Clear overlays
+                overlayCtx.clearRect(0, 0, overlay.width, overlay.height);
+                textCtx.clearRect(0, 0, textOverlay.width, textOverlay.height);
+                
+                // Draw face detections and labels
+                trackedFaces.forEach((box, faceId) => {
+                    const faceClass = faceClasses.get(faceId);
+                    const boxColor = getClassColor(faceClass);
+                    const faceLabel = getFaceLabel(faceClass, faceId);
+
+                    // Update meter after drawing each face
+                    updateMeter();
+
+                    // Draw rounded rectangle for face detection box
+                    const radius = 15;
+                    overlayCtx.strokeStyle = boxColor;
+                    overlayCtx.lineWidth = 5;
+                    overlayCtx.beginPath();
+                    overlayCtx.moveTo(box.x + radius, box.y);
+                    overlayCtx.lineTo(box.x + box.width - radius, box.y);
+                    overlayCtx.quadraticCurveTo(box.x + box.width, box.y, box.x + box.width, box.y + radius);
+                    overlayCtx.lineTo(box.x + box.width, box.y + box.height - radius);
+                    overlayCtx.quadraticCurveTo(box.x + box.width, box.y + box.height, box.x + box.width - radius, box.y + box.height);
+                    overlayCtx.lineTo(box.x + radius, box.y + box.height);
+                    overlayCtx.quadraticCurveTo(box.x, box.y + box.height, box.x, box.y + box.height - radius);
+                    overlayCtx.lineTo(box.x, box.y + radius);
+                    overlayCtx.quadraticCurveTo(box.x, box.y, box.x + radius, box.y);
+                    overlayCtx.stroke();
+
+                    // Calculate mirrored x position for text
+                    const mirroredX = textOverlay.width - box.x - box.width;
+                    
+                    // Draw class label first (above face)
+                    textCtx.font = '40px DM Sans';
+                    
+                    // Measure text for background
+                    const textWidth = textCtx.measureText(faceLabel).width;
+                    const padding = 14;
+                    const textHeight = 48; // Increased to accommodate descending letters
+                    const textRadius = 8;
+                    
+                    // Calculate text background position with adjusted alignment
+                    const bgX = mirroredX - padding + 8;
+                    const bgY = box.y - textHeight - padding - 0;
+                    const bgWidth = textWidth + (padding * 2);
+                    const bgHeight = textHeight;
+                    
+                    // Draw rounded rectangle for text background
+                    textCtx.fillStyle = 'black';
+                    textCtx.beginPath();
+                    textCtx.moveTo(bgX + textRadius, bgY);
+                    textCtx.lineTo(bgX + bgWidth - textRadius, bgY);
+                    textCtx.quadraticCurveTo(bgX + bgWidth, bgY, bgX + bgWidth, bgY + textRadius);
+                    textCtx.lineTo(bgX + bgWidth, bgY + bgHeight - textRadius);
+                    textCtx.quadraticCurveTo(bgX + bgWidth, bgY + bgHeight, bgX + bgWidth - textRadius, bgY + bgHeight);
+                    textCtx.lineTo(bgX + textRadius, bgY + bgHeight);
+                    textCtx.quadraticCurveTo(bgX, bgY + bgHeight, bgX, bgY + bgHeight - textRadius);
+                    textCtx.lineTo(bgX, bgY + textRadius);
+                    textCtx.quadraticCurveTo(bgX, bgY, bgX + textRadius, bgY);
+                    textCtx.fill();
+                    
+                    // Draw text with adjusted position
+                    textCtx.fillStyle = 'white';
+                    textCtx.fillText(
+                        faceLabel,
+                        mirroredX + 8,
+                        box.y - 25 // Adjusted to center text vertically in the taller box
+                    );
+                });
+
+                // Update class text box after processing all faces
+                updateClassTextBox();
+            }, 200);
+        }
+
+        function updateClock() {
+      const now = new Date();
+      const formatted = now.getFullYear() + '-' +
+        String(now.getMonth() + 1).padStart(2, '0') + '-' +
+        String(now.getDate()).padStart(2, '0') + ' ' +
+        String(now.getHours()).padStart(2, '0') + ':' +
+        String(now.getMinutes()).padStart(2, '0') + ':' +
+        String(now.getSeconds()).padStart(2, '0');
+      
+      document.getElementById('timestamp').textContent = formatted;
+    }
+
+    updateClock(); // initial call
+    setInterval(updateClock, 1000); // update every second
+    </script>
+</body>
+</html> 
+
+
